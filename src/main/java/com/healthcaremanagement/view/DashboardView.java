@@ -4,124 +4,130 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import com.healthcaremanagement.component.DashboardHeaderComponent;
+import com.healthcaremanagement.component.MetricCardComponent;
+import com.healthcaremanagement.model.MetricCard;
+import com.healthcaremanagement.util.DashboardMetricsProvider;
+import com.healthcaremanagement.util.StyleConstants;
+import java.util.List;
 
 /**
  * DashboardView - User Dashboard Interface
  * 
  * Displays the main dashboard after successful authentication.
  * Shows role-specific metrics and provides logout functionality.
+ * 
+ * Refactored to use separate components and utility classes for better maintainability.
  */
 public class DashboardView {
+    
+    private static final int WINDOW_WIDTH = 750;
+    private static final int WINDOW_HEIGHT = 550;
+    private static final int METRICS_GAP = 20;
+    private static final int WORKSPACE_PADDING = 40;
+    private static final int WORKSPACE_SPACING = 25;
 
-    private static final String APP_TITLE = "Healthcare Management System";
-
+    /**
+     * Displays the dashboard view
+     * 
+     * @param stage Primary stage for scene display
+     * @param user Username of logged-in user
+     * @param activeRole Role of the logged-in user
+     */
     public void show(Stage stage, String user, String activeRole) {
         BorderPane layout = new BorderPane();
-        layout.setStyle("-fx-background-color: #f8f9fa;");
+        layout.setStyle(StyleConstants.PANEL_BACKGROUND_STYLE);
 
-        // Top Navigation Banner
-        HBox topNav = new HBox();
-        topNav.setPadding(new Insets(15, 30, 15, 30));
-        topNav.setAlignment(Pos.CENTER_LEFT);
-        topNav.setStyle("-fx-background-color: #0f5132;");
+        // Set header
+        layout.setTop(DashboardHeaderComponent.createHeader(activeRole));
 
-        Text titleText = new Text(APP_TITLE);
-        titleText.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        titleText.setFill(Color.WHITE);
+        // Set center workspace
+        layout.setCenter(createWorkspace(user, activeRole, stage));
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Label sessionLabel = new Label("Active Session: " + activeRole);
-        sessionLabel.setFont(Font.font("Segoe UI", FontWeight.MEDIUM, 13));
-        sessionLabel.setTextFill(Color.valueOf("#e8f5e9"));
-        sessionLabel.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-padding: 6 12; -fx-background-radius: 6;");
-
-        topNav.getChildren().addAll(titleText, spacer, sessionLabel);
-        layout.setTop(topNav);
-
-        // Center Workspace
-        VBox workspace = new VBox(25);
-        workspace.setPadding(new Insets(40));
-        workspace.setAlignment(Pos.TOP_LEFT);
-
-        Text welcomeMsg = new Text("Welcome Back, " + user + "!");
-        welcomeMsg.setFont(Font.font("Segoe UI", FontWeight.BOLD, 26));
-        welcomeMsg.setFill(Color.valueOf("#212529"));
-
-        Text description = new Text("Here is an overview of your management dashboard tools and profile metrics.");
-        description.setFont(Font.font("Segoe UI", 14));
-        description.setFill(Color.valueOf("#6c757d"));
-
-        // Metrics Grid
-        GridPane metricsGrid = new GridPane();
-        metricsGrid.setHgap(20);
-        metricsGrid.setVgap(20);
-
-        if ("Admin".equalsIgnoreCase(activeRole)) {
-            metricsGrid.add(createMetricCard("System Status", "Operational", "#198754"), 0, 0);
-            metricsGrid.add(createMetricCard("Active Users", "14 Staff Online", "#0d6efd"), 1, 0);
-        } else if ("Doctor".equalsIgnoreCase(activeRole)) {
-            metricsGrid.add(createMetricCard("Today's Appointments", "6 Remaining", "#fd7e14"), 0, 0);
-            metricsGrid.add(createMetricCard("Pending Lab Reports", "3 Files", "#dc3545"), 1, 0);
-        } else { // Patient
-            metricsGrid.add(createMetricCard("Medical Record", "Up to date", "#198754"), 0, 0);
-            metricsGrid.add(createMetricCard("Next Checkup", "Tomorrow, 9 AM", "#6f42c1"), 1, 0);
-        }
-
-        // Logout Button
-        Button logoutBtn = new Button("Secure Log Out");
-        logoutBtn.setPrefSize(160, 40);
-        logoutBtn.setStyle(
-                "-fx-background-color: #dc3545;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-background-radius: 8;" +
-                        "-fx-cursor: hand;"
-        );
-        logoutBtn.setOnAction(e -> {
-            LoginView loginView = new LoginView();
-            loginView.show(stage);
-        });
-
-        workspace.getChildren().addAll(welcomeMsg, description, metricsGrid, logoutBtn);
-        layout.setCenter(workspace);
-
-        Scene currentScene = new Scene(layout, 750, 550);
-        stage.setTitle(APP_TITLE + " — WorkStation Panel");
+        Scene currentScene = new Scene(layout, WINDOW_WIDTH, WINDOW_HEIGHT);
+        stage.setTitle(StyleConstants.APP_TITLE + " — WorkStation Panel");
         stage.setScene(currentScene);
         stage.setResizable(true);
         stage.centerOnScreen();
     }
 
-    private VBox createMetricCard(String headline, String counter, String hexBorderColor) {
-        VBox metricBox = new VBox(8);
-        metricBox.setPrefSize(240, 100);
-        metricBox.setPadding(new Insets(16));
-        metricBox.setStyle(
-                "-fx-background-color: #ffffff;" +
-                        "-fx-background-radius: 10;" +
-                        "-fx-border-color: " + hexBorderColor + ";" +
-                        "-fx-border-width: 0 0 0 5;" +
-                        "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.03), 10, 0, 0, 4);"
-        );
+    /**
+     * Creates the main workspace area
+     * 
+     * @param user Username to display in welcome message
+     * @param activeRole User's role
+     * @param stage Stage for logout action
+     * @return VBox containing the workspace
+     */
+    private VBox createWorkspace(String user, String activeRole, Stage stage) {
+        VBox workspace = new VBox(WORKSPACE_SPACING);
+        workspace.setPadding(new Insets(WORKSPACE_PADDING));
+        workspace.setAlignment(Pos.TOP_LEFT);
 
-        Label head = new Label(headline.toUpperCase());
-        head.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        head.setTextFill(Color.valueOf("#6c757d"));
+        // Welcome message
+        Text welcomeMsg = new Text("Welcome Back, " + user + "!");
+        welcomeMsg.setFont(Font.font(StyleConstants.FONT_FAMILY, FontWeight.BOLD, StyleConstants.FONT_SIZE_LARGE));
+        welcomeMsg.setFill(Color.valueOf(StyleConstants.COLOR_TEXT_DARK));
 
-        Label count = new Label(counter);
-        count.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
-        count.setTextFill(Color.valueOf("#212529"));
+        // Description
+        Text description = new Text("Here is an overview of your management dashboard tools and profile metrics.");
+        description.setFont(Font.font(StyleConstants.FONT_FAMILY, StyleConstants.FONT_SIZE_NORMAL));
+        description.setFill(Color.valueOf(StyleConstants.COLOR_TEXT_MUTED));
 
-        metricBox.getChildren().addAll(head, count);
-        return metricBox;
+        // Metrics grid
+        GridPane metricsGrid = createMetricsGrid(activeRole);
+
+        // Logout button
+        Button logoutBtn = createLogoutButton(stage);
+
+        workspace.getChildren().addAll(welcomeMsg, description, metricsGrid, logoutBtn);
+        return workspace;
+    }
+
+    /**
+     * Creates metrics grid with role-specific cards
+     * 
+     * @param activeRole User's role
+     * @return GridPane containing metric cards
+     */
+    private GridPane createMetricsGrid(String activeRole) {
+        GridPane metricsGrid = new GridPane();
+        metricsGrid.setHgap(METRICS_GAP);
+        metricsGrid.setVgap(METRICS_GAP);
+
+        // Get metrics for the user's role
+        List<MetricCard> metrics = DashboardMetricsProvider.getMetricsForRole(activeRole);
+        
+        // Add metrics to grid (2 columns)
+        int column = 0;
+        for (MetricCard metric : metrics) {
+            metricsGrid.add(MetricCardComponent.createMetricCard(metric), column, 0);
+            column++;
+        }
+
+        return metricsGrid;
+    }
+
+    /**
+     * Creates the logout button
+     * 
+     * @param stage Stage for logout action
+     * @return Button configured for logout
+     */
+    private Button createLogoutButton(Stage stage) {
+        Button logoutBtn = new Button("Secure Log Out");
+        logoutBtn.setPrefSize(160, 40);
+        logoutBtn.setStyle(StyleConstants.BUTTON_LOGOUT_STYLE);
+        logoutBtn.setOnAction(e -> {
+            LoginView loginView = new LoginView();
+            loginView.show(stage);
+        });
+        return logoutBtn;
     }
 }
